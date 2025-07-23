@@ -1,47 +1,55 @@
-!/bin/bash
-#usage ./download_from_kaggle.sh .sh datasetname gcs_project_id
+#!/bin/bash
+# Uso: ./download_from_kaggle.sh moltean/fruits meu-projeto-gcp
 
-# Installing python3 and pip and the dependencies
-sudo apt update
-sudo apt install -y python3 python3-dev python3-venv
-sudo apt install -y wget unzip
-wget https://bootstrap.pypa.io/get-pip.py
-sudo python3 get-pip.py
+DATASET_NAME=$1
+PROJECT_ID=$2
+BUCKET_NAME="${PROJECT_ID}-dataset"
 
-# Installing kaggle API
-pip3 install kaggle
+# Instalar dependências
+sudo apt update && sudo apt install -y python3 python3-pip unzip wget
+pip3 install --upgrade kaggle
 
-# updating $PATH
-export PATH=$PATH:/home/$USER/.local/bin
-
-#Import kaggle.json to the VM and copy it to .kaggle 
+# Configurar Kaggle API
 mkdir -p ~/.kaggle
 cp kaggle.json ~/.kaggle/
 chmod 600 ~/.kaggle/kaggle.json
 
-# download the dataset 
-echo "downloading dataset from: $1..."
-kaggle datasets download -d $1
+# Baixar o dataset
+echo "⬇️ Baixando dataset $DATASET_NAME ..."
+kaggle datasets download -d $DATASET_NAME
 
-#unzip it
-echo "unzipping file... "
- 
+# Extrair os arquivos
+echo "📂 Extraindo arquivos..."
+unzip -q fruits.zip -d fruits
 
-for file in *.zip
-do
-unzip "$file" -d ./
-done
+# Criar bucket no GCS
+echo "☁️ Criando bucket gs://$BUCKET_NAME ..."
+gcloud config set project $PROJECT_ID
+gsutil mb -p $PROJECT_ID gs://$BUCKET_NAME/
 
-#Creating  GCS bucket(with default setup) 
-echo "setting project and creating bucket on GCS..."
-bucket_name=$2"-dataset"
-gcloud config set project $2
-gsutil mb gs://$bucket_name/
-echo "bucket created..."
+# Enviar imagens
+echo "📤 Enviando imagens ao GCS..."
+gsutil -m cp -r fruits/fruits-360/Training/* gs://$BUCKET_NAME/images/
 
-#upload it to GCS
-echo "uploading to GCS..."
-gsutil cp *.csv gs://$bucket_name
+# Gerar CSV
+echo "📝 Gerando CSV localmente..."
+python3 <<EOF
+import csv, os
+bucket = "$BUCKET_NAME"
+path = "dataset.csv"
+with open(path, "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["SET", "IMAGE_PATH", "LABEL"])
+    base = "fruits/fruits-360/Training"
+    for label in os.listdir(base):
+        folder = os.path.join(base, label)
+        if os.path.isdir(folder):
+            for img in os.listdir(folder):
+                w.writerow(["TRAIN", f"gs://{bucket}/images/{label}/{img}", label])
+EOF
 
-echo "upload complete ..."
-# Note that the VM need to have GCS write access 
+# Enviar CSV
+echo "📤 Enviando CSV ao GCS..."
+gsutil cp dataset.csv gs://$BUCKET_NAME/
+
+echo "✅ Concluído!"
