@@ -28,10 +28,18 @@ Training/
 
 ## ⚙️ Pré-requisitos
 
-- Ambiente configurado com **Google Cloud SDK**
-- Ativar a **Vertex AI API**
-- Ter permissão de escrita no bucket do GCS
-- Conta no [Kaggle](https://www.kaggle.com/) com `kaggle.json`
+### Para rodar no Cloud Shell
+
+- Conta Google Cloud com projeto ativo
+- Bucket no GCS (ou será criado automaticamente)
+- Arquivo `kaggle.json` com suas credenciais da [API do Kaggle](https://www.kaggle.com/me/account)
+
+### Instale as dependências (se necessário)
+
+```bash
+sudo apt update && sudo apt install -y python3 python3-pip unzip wget
+pip3 install --upgrade kaggle
+```
 
 ---
 
